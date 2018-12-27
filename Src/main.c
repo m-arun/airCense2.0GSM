@@ -104,39 +104,68 @@ uint8_t atCommandGet[13][100] = {
 		"AT+HTTPPARA=\"CID\",1\r",
 		"AT+HTTPPARA=\"URL\",\"http:\/\/m2msupport.net\/m2msupport\/test.php\"\r",
 		"AT+HTTPACTION=0\"\r",
-		"AT+HTTPREAD\r"
+		"AT+HTTPREAD\r"			//read the data of the HTTP server
 		};
 */
 /**
  * HTTP GET operation complete.
  */
 
+
+/**
+ * Section of ATCommands to perform a HTTP POST operation,
+ * By Hosting a HTTP Server on "http://139.59.88.117:3250/registerApp".
+ * This section of ATCommands will initialize the SIM800C module for -
+ * HTTP POST Operation.
+ * The content to be hosted is considered to be packed as a JSON object.
+ */
 uint8_t atCommandStart[12][100] = {
 		"AT\r",
-		"AT+CREG?\r",
-		"AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r",
-		"AT+SAPBR=3,1,\"APN\",\"airtelgprs.com\"\r",
-		"AT+SAPBR=1,1\r",
-		"AT+SAPBR=2,1\r",
-		"AT+HTTPINIT\r",
-		"AT+HTTPPARA=\"PROIP\",\"0.0.0.0\"\r",
-		"AT+HTTPPARA=\"PROPORT\",\"8080\"\r",
-		"AT+HTTPPARA=\"CONTENT\",\"application\/json\"\r",
-		"AT+HTTPPARA=\"CID\",1\r",
-		"AT+HTTPPARA=\"URL\",\"http:\/\/139.59.88.117:3250\/registerApp\"\r"
+		"AT+CREG?\r",										// Get current registration status
+		"AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r",				// Set up profile 1, connection type to internet
+		"AT+SAPBR=3,1,\"APN\",\"airtelgprs.com\"\r",		// Activate bearer profile
+		"AT+SAPBR=1,1\r",									// Apply the profile to the connection
+		"AT+SAPBR=2,1\r",									// Check if IP is assigned
+		"AT+HTTPINIT\r",									// Initiate the HTTP service
+		"AT+HTTPPARA=\"PROIP\",\"0.0.0.0\"\r",				// Proxy setting
+		"AT+HTTPPARA=\"PROPORT\",\"8080\"\r",				// Proxy setting
+		"AT+HTTPPARA=\"CONTENT\",\"application\/json\"\r",	// Set the content type to JSON
+		"AT+HTTPPARA=\"CID\",1\r",							// Set the HTTP session
+		"AT+HTTPPARA=\"URL\",\"http:\/\/139.59.88.117:3250\/registerApp\"\r"	//Set the HTPP URL
 		};
+/**
+ * HTTP Initialize operation complete.
+ */
 
+
+
+/**
+ * Section of ATCommands to RESET the SIM800C module.
+ */
 uint8_t atCommandReset[2][15] = {
-		"AT+CFUN=0\r",
-		"AT+CFUN=1\r"
+		"AT+CFUN=0\r",		//Set for minimum functionality
+		"AT+CFUN=1\r"		//Set for full functionality
 		};
+/**
+ * SIM800C Resetcomplete.
+ */
 
-uint8_t atCommandPost[4][30] = {
-		"AT+HTTPTERM\r",
-		"AT+HTTPINIT\r",
-		"AT+HTTPDATA=50,10000\r",
-		"AT+HTTPACTION=1\r"
+
+
+/**
+ * Section of ATCommands to perform a HTTP POST operation,
+ */
+uint8_t atCommandPost[5][30] = {
+		"AT\r",
+		"AT+HTTPTERM\r",			// Terminate the HTTP service
+		"AT+HTTPINIT\r",			// Initiate the HTTP service
+		"AT+HTTPDATA=50,10000\r",  	// 50 bytes of data, 10sec timeout to enter the data.
+									// Inactivity of 10sec will complete data feed operation.
+		"AT+HTTPACTION=1\r"			// Start the HTTP POST session
 		};
+/**
+ * HTTP POST operation complete.
+ */
 
 /* USER CODE END 0 */
 
@@ -150,7 +179,7 @@ int main(void)
 	/* USER CODE BEGIN 1 */
 	uint8_t startIdx = 0;
 	uint8_t sendIdx = 0;
-	uint8_t resetIdx = 0;
+//	uint8_t resetIdx = 0;
 
 	/* USER CODE END 1 */
 
@@ -215,34 +244,34 @@ int main(void)
 				break;
 			}
 		case GSM_RESET_STATE: {
-				if(flag==1){
-					if(strstr(buffer, "OK")){
-						HAL_Delay(3000);
-						strcpy(txBuff, atCommandReset[sendIdx]);
-						len = strlen(txBuff);
-						HAL_UART_Transmit_IT(&huart6, txBuff, len);
-						resetIdx++;
-						if(resetIdx == 3){
-							gsmState = GSM_START_STATE;
-							break;
-						}
-					}
-					else if(strstr(buffer, "ERROR")){
-						gsmState = GSM_RESET_STATE;
-						break;
-					}
-					else
-						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-					idx = 0;
-					flag=0;
-					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-					nextTx = 0;
-
-				}
-				if(nextTx == 1){
-					nextTx = 0;
-					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-				}
+//				if(flag==1){
+//					if(strstr(buffer, "OK")){
+//						HAL_Delay(3000);
+//						strcpy(txBuff, atCommandReset[sendIdx]);
+//						len = strlen(txBuff);
+//						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+//						resetIdx++;
+//						if(resetIdx == 3){
+//							gsmState = GSM_START_STATE;
+//							break;
+//						}
+//					}
+//					else if(strstr(buffer, "ERROR")){
+//						gsmState = GSM_RESET_STATE;
+//						break;
+//					}
+//					else
+//						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+//					idx = 0;
+//					flag=0;
+//					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+//					nextTx = 0;
+//
+//				}
+//				if(nextTx == 1){
+//					nextTx = 0;
+//					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+//				}
 				break;
 			}
 		case GSM_SEND_STATE: {
@@ -252,7 +281,10 @@ int main(void)
 						len = strlen(txBuff);
 						HAL_UART_Transmit_IT(&huart6, txBuff, len);
 						sendIdx++;
-						if(sendIdx == 5){
+//						if(sendIdx == 4){						//
+//							--> append JSON data & wait 10sec.	// Accumulated sensor data to be appended here,
+//						}										//
+						if(sendIdx == 6){
 							sendIdx = 0;
 							gsmState = GSM_SEND_STATE;
 							break;
