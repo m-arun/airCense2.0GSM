@@ -60,6 +60,18 @@ static void MX_USART6_UART_Init(void);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
+/*!
+ * Device states
+ */
+
+static enum eState
+{
+	GSM_START_STATE,
+	GSM_SEND_STATE,
+	GSM_RESET_STATE,
+	GSM_WAIT_STATE
+}gsmState;
+
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -74,14 +86,57 @@ uint8_t nextTx = 0;
 uint8_t len;
 uint8_t match;
 
-uint8_t atCommand[6][100] = {
+/**
+ * Section of ATCommands to perfom a HTTP GET operation,
+ * from "http://m2msupport.net/m2msupport/test.php".
+ */
+/*
+uint8_t atCommandGet[13][100] = {
 		"AT\r",
 		"AT+CREG?\r",
 		"AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r",
 		"AT+SAPBR=3,1,\"APN\",\"airtelgprs.com\"\r",
 		"AT+SAPBR=1,1\r",
-		"AT+SAPBR=2,1\r"
-};
+		"AT+SAPBR=2,1\r",
+		"AT+HTTPINIT\r",
+		"AT+HTTPPARA=\"PROIP\",\"0.0.0.0\"\r",
+		"AT+HTTPPARA=\"PROPORT\",\"8080\"\r",
+		"AT+HTTPPARA=\"CID\",1\r",
+		"AT+HTTPPARA=\"URL\",\"http:\/\/m2msupport.net\/m2msupport\/test.php\"\r",
+		"AT+HTTPACTION=0\"\r",
+		"AT+HTTPREAD\r"
+		};
+*/
+/**
+ * HTTP GET operation complete.
+ */
+
+uint8_t atCommandStart[12][100] = {
+		"AT\r",
+		"AT+CREG?\r",
+		"AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r",
+		"AT+SAPBR=3,1,\"APN\",\"airtelgprs.com\"\r",
+		"AT+SAPBR=1,1\r",
+		"AT+SAPBR=2,1\r",
+		"AT+HTTPINIT\r",
+		"AT+HTTPPARA=\"PROIP\",\"0.0.0.0\"\r",
+		"AT+HTTPPARA=\"PROPORT\",\"8080\"\r",
+		"AT+HTTPPARA=\"CONTENT\",\"application\/json\"\r",
+		"AT+HTTPPARA=\"CID\",1\r",
+		"AT+HTTPPARA=\"URL\",\"http:\/\/139.59.88.117:3250\/registerApp\"\r"
+		};
+
+uint8_t atCommandReset[2][15] = {
+		"AT+CFUN=0\r",
+		"AT+CFUN=1\r"
+		};
+
+uint8_t atCommandPost[4][30] = {
+		"AT+HTTPTERM\r",
+		"AT+HTTPINIT\r",
+		"AT+HTTPDATA=50,10000\r",
+		"AT+HTTPACTION=1\r"
+		};
 
 /* USER CODE END 0 */
 
@@ -93,7 +148,9 @@ uint8_t atCommand[6][100] = {
 int main(void)
 {
 	/* USER CODE BEGIN 1 */
-	uint8_t i = 0;
+	uint8_t startIdx = 0;
+	uint8_t sendIdx = 0;
+	uint8_t resetIdx = 0;
 
 	/* USER CODE END 1 */
 
@@ -117,41 +174,119 @@ int main(void)
 	MX_GPIO_Init();
 	MX_USART6_UART_Init();
 	/* USER CODE BEGIN 2 */
+
+	gsmState = GSM_START_STATE;
 	HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-	strcpy(txBuff, atCommand[i]);
+	strcpy(txBuff, atCommandStart[startIdx]);
 	len = strlen(txBuff);
 	HAL_UART_Transmit_IT(&huart6, txBuff, len);
-	i++;
-	while (1)
+	startIdx++;
+	while(1)
 	{
-		/* USER CODE END WHILE */
+		switch(gsmState){
+		case GSM_START_STATE: {
+				if(flag==1){
+					if(strstr(buffer, "OK")){
+						strcpy(txBuff, atCommandStart[startIdx]);
+						len = strlen(txBuff);
+						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+						startIdx++;
+						if(startIdx == 13){
+							gsmState = GSM_SEND_STATE;
+							break;
+						}
+					}
+					else if(strstr(buffer, "ERROR")){
+						gsmState = GSM_RESET_STATE;
+						break;
+					}
+					else
+						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					idx = 0;
+					flag=0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					nextTx = 0;
 
-		/* USER CODE BEGIN 3 */
-		if(flag==1){
-			if(strstr(buffer, "OK")){
-				match = 1;
-				strcpy(txBuff, atCommand[i]);
-				len = strlen(txBuff);
-				HAL_UART_Transmit_IT(&huart6, txBuff, len);
-				i++;
+				}
+				if(nextTx == 1){
+					nextTx = 0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+				}
+				break;
 			}
-			else
-				HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-			idx = 0;
-			flag=0;
-			HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-			nextTx = 0;
+		case GSM_RESET_STATE: {
+				if(flag==1){
+					if(strstr(buffer, "OK")){
+						HAL_Delay(3000);
+						strcpy(txBuff, atCommandReset[sendIdx]);
+						len = strlen(txBuff);
+						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+						resetIdx++;
+						if(resetIdx == 3){
+							gsmState = GSM_START_STATE;
+							break;
+						}
+					}
+					else if(strstr(buffer, "ERROR")){
+						gsmState = GSM_RESET_STATE;
+						break;
+					}
+					else
+						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					idx = 0;
+					flag=0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					nextTx = 0;
 
-		}
-		if(nextTx == 1){
-			nextTx = 0;
-			HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+				}
+				if(nextTx == 1){
+					nextTx = 0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+				}
+				break;
+			}
+		case GSM_SEND_STATE: {
+				if(flag==1){
+					if(strstr(buffer, "OK")){
+						strcpy(txBuff, atCommandPost[sendIdx]);
+						len = strlen(txBuff);
+						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+						sendIdx++;
+						if(sendIdx == 5){
+							sendIdx = 0;
+							gsmState = GSM_SEND_STATE;
+							break;
+						}
+					}
+					else if(strstr(buffer, "ERROR")){
+						gsmState = GSM_RESET_STATE;
+						break;
+					}
+					else
+						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					idx = 0;
+					flag=0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+					nextTx = 0;
+
+				}
+				if(nextTx == 1){
+					nextTx = 0;
+					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
+				}
+				break;
+			}
+		case GSM_WAIT_STATE: {
+				HAL_Delay(100);
+				break;
+			}
+		default: {
+				gsmState = GSM_START_STATE;
+				break;
+			}
 		}
 
 	}
-
-	/* USER CODE END 3 */
-
 }
 
 /**
