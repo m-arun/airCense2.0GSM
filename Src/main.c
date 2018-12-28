@@ -78,36 +78,15 @@ static enum eState
 
 /* USER CODE BEGIN 0 */
 
-uint8_t buffer[100];
-uint8_t txBuff[100];
+uint8_t rxBuffer[100];
+uint8_t txBuffer[100];
 uint8_t rxChar;
-uint8_t flag;
-//uint8_t txCpltFlg;
+uint8_t rxCpltFlg;
 uint8_t idx = 0;
 uint8_t nextTx = 0;
 uint8_t len;
-uint8_t match;
+//uint8_t txCpltFlg;
 
-
-/**
- * Section of ATCommands to perform a TCP operation
- */
-/*
-uint8_t atCommandTCP[10][100] = {
-		"AT\r",
-		"AT+CREG?\r",
-		"AT+CGATT=1\r",
-		"AT+CIPSHUT\r",
-		"AT+CIPMUX=0\r",
-		"AT+CSTT=\"airtelgprs.com\",\"\",\"\"\r",
-		"AT+CIICR\r",
-		"AT+CIFSR\r",
-		"AT+CIPSTART=\"TCP\",\"SERVER DOMAIN NAME(or)PUBLIC IP\",\"PORT NUMBER\"\r",
-		"AT+CIPSEND\r"
-*/
-/**
- * TCP operation complete.
- */
 
 /**
  * Section of ATCommands to perform a HTTP GET operation,
@@ -176,6 +155,27 @@ uint8_t atCommandReset[2][15] = {
  */
 
 
+/**
+ * Section of ATCommands to perform a TCP operation
+ */
+/*
+uint8_t atCommandTCP[10][100] = {
+		"AT\r",
+		"AT+CREG?\r",
+		"AT+CGATT=1\r",
+		"AT+CIPSHUT\r",
+		"AT+CIPMUX=0\r",
+		"AT+CSTT=\"airtelgprs.com\",\"\",\"\"\r",
+		"AT+CIICR\r",
+		"AT+CIFSR\r",
+		"AT+CIPSTART=\"TCP\",\"SERVER DOMAIN NAME(or)PUBLIC IP\",\"PORT NUMBER\"\r",
+		"AT+CIPSEND\r"
+*/
+/**
+ * TCP operation complete.
+ */
+
+
 
 /**
  * Section of ATCommands to perform a HTTP POST operation,
@@ -231,33 +231,33 @@ int main(void)
 
 	gsmState = GSM_START_STATE;
 	HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-	strcpy(txBuff, atCommandStart[startIdx]);
-	len = strlen(txBuff);
-	HAL_UART_Transmit_IT(&huart6, txBuff, len);
+	strcpy(txBuffer, atCommandStart[startIdx]);
+	len = strlen(txBuffer);
+	HAL_UART_Transmit_IT(&huart6, txBuffer, len);
 	startIdx++;
 	while(1)
 	{
 		switch(gsmState){
 		case GSM_START_STATE: {
-				if(flag==1){
-					if(strstr(buffer, "OK")){
-						strcpy(txBuff, atCommandStart[startIdx]);
-						len = strlen(txBuff);
-						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+				if(rxCpltFlg==1){
+					if(strstr(rxBuffer, "OK")){
+						strcpy(txBuffer, atCommandStart[startIdx]);
+						len = strlen(txBuffer);
+						HAL_UART_Transmit_IT(&huart6, txBuffer, len);
 						startIdx++;
 						if(startIdx == 13){
 							gsmState = GSM_SEND_STATE;
 							break;
 						}
 					}
-					else if(strstr(buffer, "ERROR")){
+					else if(strstr(rxBuffer, "ERROR")){
 						gsmState = GSM_RESET_STATE;
 						break;
 					}
 					else
 						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
 					idx = 0;
-					flag=0;
+					rxCpltFlg=0;
 					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
 					nextTx = 0;
 
@@ -276,11 +276,11 @@ int main(void)
 				break;
 			}
 		case GSM_SEND_STATE: {
-				if(flag==1){
-					if(strstr(buffer, "OK")){
-						strcpy(txBuff, atCommandPost[sendIdx]);
-						len = strlen(txBuff);
-						HAL_UART_Transmit_IT(&huart6, txBuff, len);
+				if(rxCpltFlg==1){
+					if(strstr(rxBuffer, "OK")){
+						strcpy(txBuffer, atCommandPost[sendIdx]);
+						len = strlen(txBuffer);
+						HAL_UART_Transmit_IT(&huart6, txBuffer, len);
 						sendIdx++;
 //						if(sendIdx == 4){						//
 //							--> append JSON data & wait 10sec.	// Accumulated sensor data to be appended here,
@@ -291,14 +291,14 @@ int main(void)
 							break;
 						}
 					}
-					else if(strstr(buffer, "ERROR")){
+					else if(strstr(rxBuffer, "ERROR")){
 						gsmState = GSM_RESET_STATE;
 						break;
 					}
 					else
 						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
 					idx = 0;
-					flag=0;
+					rxCpltFlg=0;
 					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
 					nextTx = 0;
 
@@ -449,10 +449,10 @@ void _Error_Handler(char *file, int line)
 void HAL_UART_RxCpltCallback( UART_HandleTypeDef *huart6 )
 {
 	if(rxChar == 0x0a){
-		flag = 1;
+		rxCpltFlg = 1;
 	}
 	else{
-		buffer[idx++] = rxChar;
+		rxBuffer[idx++] = rxChar;
 		nextTx = 1;
 	}
 }
