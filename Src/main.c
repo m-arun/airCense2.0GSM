@@ -60,6 +60,8 @@ static void MX_USART6_UART_Init(void);
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
 
+#define RESETPIN 	GPIO_PIN_9			// PC9, Connected to corresponding Reset on SIM800C.
+
 /*!
  * Device states
  */
@@ -80,14 +82,35 @@ uint8_t buffer[100];
 uint8_t txBuff[100];
 uint8_t rxChar;
 uint8_t flag;
-uint8_t txCpltFlg;
+//uint8_t txCpltFlg;
 uint8_t idx = 0;
 uint8_t nextTx = 0;
 uint8_t len;
 uint8_t match;
 
+
 /**
- * Section of ATCommands to perfom a HTTP GET operation,
+ * Section of ATCommands to perform a TCP operation
+ */
+/*
+uint8_t atCommandTCP[10][100] = {
+		"AT\r",
+		"AT+CREG?\r",
+		"AT+CGATT=1\r",
+		"AT+CIPSHUT\r",
+		"AT+CIPMUX=0\r",
+		"AT+CSTT=\"airtelgprs.com\",\"\",\"\"\r",
+		"AT+CIICR\r",
+		"AT+CIFSR\r",
+		"AT+CIPSTART=\"TCP\",\"SERVER DOMAIN NAME(or)PUBLIC IP\",\"PORT NUMBER\"\r",
+		"AT+CIPSEND\r"
+*/
+/**
+ * TCP operation complete.
+ */
+
+/**
+ * Section of ATCommands to perform a HTTP GET operation,
  * from "http://m2msupport.net/m2msupport/test.php".
  */
 /*
@@ -142,10 +165,12 @@ uint8_t atCommandStart[12][100] = {
 /**
  * Section of ATCommands to RESET the SIM800C module.
  */
+/*
 uint8_t atCommandReset[2][15] = {
 		"AT+CFUN=0\r",		//Set for minimum functionality
 		"AT+CFUN=1\r"		//Set for full functionality
 		};
+*/
 /**
  * SIM800C Resetcomplete.
  */
@@ -244,34 +269,10 @@ int main(void)
 				break;
 			}
 		case GSM_RESET_STATE: {
-//				if(flag==1){
-//					if(strstr(buffer, "OK")){
-//						HAL_Delay(3000);
-//						strcpy(txBuff, atCommandReset[sendIdx]);
-//						len = strlen(txBuff);
-//						HAL_UART_Transmit_IT(&huart6, txBuff, len);
-//						resetIdx++;
-//						if(resetIdx == 3){
-//							gsmState = GSM_START_STATE;
-//							break;
-//						}
-//					}
-//					else if(strstr(buffer, "ERROR")){
-//						gsmState = GSM_RESET_STATE;
-//						break;
-//					}
-//					else
-//						HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-//					idx = 0;
-//					flag=0;
-//					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-//					nextTx = 0;
-//
-//				}
-//				if(nextTx == 1){
-//					nextTx = 0;
-//					HAL_UART_Receive_IT(&huart6, &rxChar, 1);
-//				}
+				HAL_GPIO_WritePin(GPIOC, RESETPIN, GPIO_PIN_SET);
+				HAL_Delay(1000);
+				HAL_GPIO_WritePin(GPIOC, RESETPIN, GPIO_PIN_RESET);
+				gsmState = GSM_START_STATE;
 				break;
 			}
 		case GSM_SEND_STATE: {
@@ -407,10 +408,21 @@ static void MX_USART6_UART_Init(void)
  */
 static void MX_GPIO_Init(void)
 {
+	  GPIO_InitTypeDef GPIO_InitStruct;
 
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOC_CLK_ENABLE();
+
+	  /*Configure GPIO pin Output Level */
+	  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+
+	  /*Configure GPIO pin : PC9 */
+	  GPIO_InitStruct.Pin = GPIO_PIN_9;
+	  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	  GPIO_InitStruct.Pull = GPIO_NOPULL;
+	  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 }
 
@@ -444,10 +456,10 @@ void HAL_UART_RxCpltCallback( UART_HandleTypeDef *huart6 )
 		nextTx = 1;
 	}
 }
-void HAL_UART_TxCpltCallback( UART_HandleTypeDef *huart6 )
-{
-		txCpltFlg = 1;
-}
+//void HAL_UART_TxCpltCallback( UART_HandleTypeDef *huart6 )
+//{
+//		txCpltFlg = 1;
+//}
 
 #ifdef  USE_FULL_ASSERT
 /**
